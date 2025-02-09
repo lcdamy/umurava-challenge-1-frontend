@@ -1,14 +1,11 @@
 "use client";
 
 import * as React from 'react';
-import "./../globals.css";
+import "./../../globals.css";
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
-const Modal = React.lazy(() => import('@/components/Modal'));
 import { workSans } from '@/utils/fonts';
 import { Providers, useAuth } from '@/providers/AuthProvider';
-import { joinCommunity } from '@/apis';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify-icon/react/dist/iconify.mjs';
 import Loading from '@/components/Loading';
 
@@ -18,42 +15,34 @@ const activeLink = (label: string, pathname: string) => {
     const realPath = pathname.split("/dashboard")[1];
     const activePath = realPath.split("/")[1];
 
-    if ((labelText === "dashboard" && pathname === "/dashboard") || (labelText.includes(activePath) && realPath)) {
+    if ((labelText === "dashboard" && pathname === "/admin/dashboard") || (labelText.includes(activePath) && realPath)) {
         return true;
     }
     return false;
 }
 
-const nav1 = [{ link: "/dashboard", label: "Dashboard" }, { link: "/dashboard/hackathons", label: "Challenges & Hackathons" }, { link: "/dashboard/community", label: "Community" }];
+const nav1 = [{ link: "/admin/dashboard", label: "Dashboard" }, { link: "/admin/dashboard/hackathons", label: "Challenges & Hackathons" }];
 
-const nav2 = [{ link: "/dashboard/settings", label: "Settings" }, { link: "/dashboard/help", label: "Help Center" }, { link: "/dashboard/refer", label: "Refer family & friends" }];
+const nav2 = [{ link: "/admin/dashboard/settings", label: "Settings" }, { link: "/admin/dashboard/help", label: "Help Center" }, { link: "/admin/dashboard/refer", label: "Refer family & friends" }];
 
 const iconMap = {
-    "/dashboard": `lineicons:home-2`,
-    "/dashboard/hackathons": `akar-icons:file`,
-    "/dashboard/community": `basil:user-plus-outline`
+    "/admin/dashboard": `lineicons:home-2`,
+    "/admin/dashboard/hackathons": `akar-icons:file`,
+    "/admin/dashboard/community": `basil:user-plus-outline`
 };
 
 const iconMap1 = {
-    "/dashboard/settings": "ion:settings-outline",
-    "/dashboard/help": "qlementine-icons:headset-16",
-    "/dashboard/refer": "octicon:gift-16"
+    "/admin/dashboard/settings": "ion:settings-outline",
+    "/admin/dashboard/help": "qlementine-icons:headset-16",
+    "/admin/dashboard/refer": "octicon:gift-16"
 };
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-    // In-App imports
-    const queryClient = useQueryClient();
+
     const pathname = usePathname();
     const router = useRouter();
 
-    // Providers
     const { data, authenticate, logout } = useAuth();
-
-    const payload: Record<string, string> = data.user ? { phoneNumber: data.user.phoneNumber || "" } : { participant: "" };
-
-    // In-App data states
-    const [isOpen, setIsOpen] = React.useState(false);
-    const [isJoining, setIsJoining] = React.useState(false);
     const [isClient, setIsClient] = React.useState(false);
 
     React.useEffect(() => {
@@ -73,23 +62,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             handleAuthentication();
         }
     }, [authenticate, router, data.token]);
-
-    // API Queries
-    const mutation = useMutation({
-        mutationFn: ({ payload }: { payload: Record<string, string> }) => joinCommunity(payload),
-        onSuccess: async (response) => {
-            console.log(response, "returned response");
-            setIsJoining(false);
-            setIsOpen(false);
-            queryClient.invalidateQueries({ queryKey: ['challenges'] })
-        },
-    })
-
-    // Action Function
-    const handleJoinCommunity = () => {
-        setIsJoining(true);
-        mutation.mutate({ payload })
-    }
 
     if (!isClient) {
         return null;
@@ -121,13 +93,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
                                     <ul className='sm:space-y-4'>
                                         {nav1.map((item, index) => (
-                                            <li key={index} className={`group flex items-center gap-1 sm:p-2 cursor-pointer rounded-md ${activeLink(item.label, pathname) ? "bg-white text-primary" : "bg-primary text-white"} hover:bg-white hover:text-primary stroke-white hover:stroke-current`} onClick={() => {
-                                                if (item.link === "/dashboard/community") {
-                                                    setIsOpen(true);
-                                                } else {
-                                                    router.push(item.link);
-                                                }
-                                            }}>
+                                            <li key={index} className={`group flex items-center gap-1 sm:p-2 cursor-pointer rounded-md ${activeLink(item.label, pathname) ? "bg-white text-primary" : "bg-primary text-white"} hover:bg-white hover:text-primary stroke-white hover:stroke-current`} onClick={() => router.push(item.link)}>
 
                                                 <Icon icon={iconMap[item.link]} className={`stroke-1 ${activeLink(item.label, pathname) ? "text-primary stroke-primary" : "text-white stroke-white"} group-hover:text-primary transition-colors size-5`} />
 
@@ -159,7 +125,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                             <p className="text-white text-sm sm:text-sm">{data && data.user.names}</p>
                                             <p className="text-white text-sm sm:text-sm"> {data && data.user.email}</p>
                                         </div>
-
                                         <Icon icon="ic:baseline-logout" className='text-white cursor-pointer size-5' onClick={() => logout()} />
                                     </div>
                                 </div>
@@ -194,31 +159,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                         </div>
                                     </div>
                                 </header>
-
-                                {/* Join Community Modal */}
-                                <Modal
-                                    isOpen={isOpen}
-                                    onClose={() => setIsOpen(false)}
-                                >
-                                    <div className='flex flex-col items-center justify-center sm:gap-4'>
-                                        <div className='bg-[#D0E0FC] rounded-full h-16 w-16 flex items-center justify-center'>
-                                            <Image
-                                                src="/svgs/Plain.svg"
-                                                alt="file"
-                                                width={4}
-                                                height={4}
-                                                className="h-4 w-4 text-primary"
-                                            />
-                                        </div>
-                                        <h1 className='font-bold text-sm sm:text-lg text-center'>Join our WhatsApp community</h1>
-                                        <p className='text-center'>Get notified on the latest projects and hackathons</p>
-
-                                        <button className="flex items-ceter gap-2 bg-primary text-white sm:text-sm hover:bg-primary/90 font-semibold p-2 sm:p-3 rounded-md" onClick={handleJoinCommunity}>
-                                            {isJoining && <Icon icon="line-md:loading-twotone-loop" width="18" height="18" />}
-                                            Join Community
-                                        </button>
-                                    </div>
-                                </Modal>
                                 <React.Suspense fallback={<Loading />}>
                                     {children}
                                 </React.Suspense>

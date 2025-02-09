@@ -2,21 +2,45 @@
 import * as React from 'react';
 import { Button } from '@/components/Button';
 import { Metric } from '@/components/Metric';
+import { CardSkeleton, MetricSkeleton } from '@/components/Skeletons';
 import { Card } from '@/components/Card';
-import { AdminMetric } from '@/components/AdminMetric';
 import { useAuth } from '../../providers/AuthProvider';
-import { hackathonsData } from '@/utils/data';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-
-
-const userStats = [{ title: "Completed challenges", value: 5 }, { title: "Open challenges", value: 200 }, { title: "Ongoing challenges", value: 250 }];
-
-const adminStats = [{ title: "Total challenges", value: 29405, percentage: " 15%", period: "This Week" }, { title: "Total Participants", value: 29405, percentage: " 15%", period: "This Week" }, { title: "Completed challenges", value: 5837, percentage: " 15%", period: "Last 30 days" }, { title: "Open challenges", value: 5837, percentage: " 15%", period: "Last 30 days" }, { title: "Ongoing challenges", value: 5837, percentage: " 15%", period: "Last 30 days" }];
+import { getChallenges } from '@/apis';
+import { useQuery } from '@tanstack/react-query';
+import Oops from '@/components/Oops';
 
 const DashboardHome = () => {
-    const { userType } = useAuth();
-    const router = useRouter()
+    // In-App imports
+    const { data, authenticate } = useAuth();
+    const router = useRouter();
+
+    // In-App States
+    React.useEffect(() => {
+        if (!data.token) {
+            const handleAuthentication = async () => {
+                try {
+                    await authenticate({ userRole: "participant" });
+                } catch (error) {
+                    console.error("Failed to authenticate:", error);
+                    router.push("/");
+                }
+            };
+
+            handleAuthentication();
+        }
+    }, [authenticate, router, data.token]);
+
+    const { data: allChallenges, isLoading, error } = useQuery({ queryKey: ['challenges'], queryFn: getChallenges })
+
+    const formattedAdminStats = [
+        { title: "Completed challenges", value: allChallenges?.data?.aggregates?.totalCompletedChallenges },
+        { title: "Open challenges", value: allChallenges?.data?.aggregates?.totalOpenChallenges },
+        { title: "Ongoing challenges", value: allChallenges?.data?.aggregates?.totalOngoingChallenges }
+    ];
+
+    const filteredChallenges = (allChallenges?.data?.challenges?.length > 0) ? allChallenges?.data?.challenges?.filter((item: { status: string }) => item.status.toLowerCase() === "open" || item.status.toLowerCase() === "ongoing") : [];
 
     const viewProfile = () => {
         console.log('View profile');
@@ -26,61 +50,33 @@ const DashboardHome = () => {
         router.push("/dashboard/hackathons");
     }
 
+    const handleViewSingle = (item) => {
+        const url = `/dashboard/hackathons/${item.challengeName}?id=${item._id}`;
+        router.push(url);
+    };
+
     return (
         <div className="flex-1 sm:pb-24">
             <div className='flex sm:flex-col sm:px-4 gap-4 sm:gap-8'>
                 <header className='flex items-center justify-between space-y-2'>
                     <div>
-                        <h1 className='font-bold text-md sm:text-lg'>Welcome back {`Hilaire`},</h1>
+                        <h1 className='font-bold text-md sm:text-lg'>Welcome back {data.user.names},</h1>
                         <p>Build Work Experience through Skills Challenges</p>
                     </div>
 
-                    {userType === "participant" && (<div>
-                        <Button icon={<Image
-                            src="/svgs/Show.svg"
-                            alt="file"
-                            width={4}
-                            height={4}
-                            className="h-4 w-4 text-primary"
-                        />} classNames="bg-primary text-white sm:text-sm hover:bg-primary/90 font-semibold p-2 sm:p-3" label="View profile" onClick={() => viewProfile()} />
-                    </div>)}
-
-                </header>
-
-                {userType === "participant" ? (<div className='grid sm:grid-cols-3 sm:gap-4'>
-                    {userStats.map((item, index) => (<Metric key={index} title={item.title} value={item.value} icon={<Image
-                        src="/svgs/Document.svg"
-                        alt="Document"
+                    <Button icon={<Image
+                        src="/svgs/Show.svg"
+                        alt="file"
                         width={4}
                         height={4}
                         className="h-4 w-4 text-primary"
-                    />} />))}
-                </div>) : (<div className='grid sm:grid-row-2 sm:gap-4'>
+                    />} classNames="bg-primary text-white sm:text-sm hover:bg-primary/90 font-semibold p-2 sm:p-3" label="View profile" onClick={() => viewProfile()} />
 
-                    <div className='grid sm:grid-cols-2 sm:gap-4'>
-                        {adminStats.slice(0, 2).map((item, index) => (<AdminMetric key={index} title={item.title} value={item.value} percentage={item.percentage} period={item.period} icon={item.title.toLowerCase().includes("participant") ? <Image
-                            src="/svgs/3User.svg"
-                            alt="file"
-                            width={4}
-                            height={4}
-                            className="h-4 w-4 text-primary"
-                        /> : <Image
-                            src="/svgs/Document.svg"
-                            alt="Document"
-                            width={4}
-                            height={4}
-                            className="h-4 w-4 text-primary"
-                        />} />))}
-                    </div>
+                </header>
 
+                {isLoading || error ? (<MetricSkeleton count={3} />) : (
                     <div className='grid sm:grid-cols-3 sm:gap-4'>
-                        {adminStats.slice(2, 5).map((item, index) => (<AdminMetric key={index} title={item.title} value={item.value} percentage={item.percentage} period={item.period} icon={item.title.toLowerCase().includes("participant") ? <Image
-                            src="/svgs/3User.svg"
-                            alt="file"
-                            width={4}
-                            height={4}
-                            className="h-4 w-4 text-primary"
-                        /> : <Image
+                        {formattedAdminStats.map((item, index) => (<Metric key={index} title={item.title} value={item.value} icon={<Image
                             src="/svgs/Document.svg"
                             alt="Document"
                             width={4}
@@ -88,39 +84,41 @@ const DashboardHome = () => {
                             className="h-4 w-4 text-primary"
                         />} />))}
                     </div>
-
-                </div>)}
+                )}
 
                 <div className='flex items-center justify-start sm:justify-between gap-4'>
                     <h1 className='font-bold text-xs sm:text-sm'>Recent Challenges</h1>
                     <div className='flex items-center sm:gap-2 gap-1 text-primary cursor-pointer' onClick={() => handleSeeAll()}>
-                        <span>{"See all"}</span>
-                        <Image
-                            src="/svgs/chevron-right.svg"
-                            alt="file"
-                            width={4}
-                            height={4}
-                            className="h-4 w-4"
-                        />
+                        {!isLoading && !error && allChallenges && allChallenges?.data && allChallenges?.data?.challenges?.length > 0 && (<>
+                            <span>{"See all"}</span>
+                            <Image
+                                src="/svgs/chevron-right.svg"
+                                alt="file"
+                                width={4}
+                                height={4}
+                                className="h-4 w-4"
+                            />
+                        </>)}
                     </div>
                 </div>
 
                 {/* Challeges and Hackathons */}
-                <div className="grid gap-2 sm:grid-cols-3 sm:gap-4">
-                    {hackathonsData.slice(0, 3).map((item, index) => (<Card
-                        status={item.status}
-                        key={index}
-                        image={item.image}
-                        title={item.title}
-                        skills={item.skills}
-                        security={item.security}
-                        timeline={item.timeline}
-                        onClick={() => console.log("View Challenge")}
-                        imageWidth={150}
-                        imageHeight={50}
-                    />))}
-                </div>
-
+                {isLoading || error ? (<CardSkeleton count={3} />) : (
+                    <div className="grid gap-2 sm:grid-cols-3 sm:gap-4">
+                        {filteredChallenges?.length > 0 ? filteredChallenges?.slice(0, 3)?.map((item: { status: string, index: string, challengeName: string, skills: Array<string>, levels: Array<string>, duration: number }, index: number) => (<Card
+                            status={item.status}
+                            key={index}
+                            image={`/white_logo.png`}
+                            title={item.challengeName}
+                            skills={item.skills}
+                            seniority={item.levels}
+                            timeline={`${item.duration} day(s)`}
+                            onClick={() => handleViewSingle(item)}
+                            imageWidth={150}
+                            imageHeight={50}
+                        />)) : (<Oops desc={"Oops!, No Challenges available"} />)}
+                    </div>
+                )}
             </div>
         </div>
     );

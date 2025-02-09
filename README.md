@@ -29,4 +29,3 @@ $ npm run build
 ## Main contributor
 
 - Author [Florien](https://www.linkedin.com/in/florien-niyongabo-7b7971142/)
-# umurava-challenge-1-frontend

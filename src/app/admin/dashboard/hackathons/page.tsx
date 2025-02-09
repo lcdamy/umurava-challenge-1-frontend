@@ -6,18 +6,17 @@ import { Button } from '@/components/Button';
 import { Pagination } from '@/components/Pagination';
 import { Card } from '@/components/Card';
 
-import { useAuth } from '@/providers/AuthProvider';
 import Image from 'next/image';
+import { getChallenges, getStatistics } from '@/apis';
 import { useQuery } from '@tanstack/react-query';
-import { getChallenges } from '@/apis';
-import { Icon } from '@iconify-icon/react/dist/iconify.mjs';
+import { useAuth } from '@/providers/AuthProvider';
 import { CardSkeleton, TabsSkeleton } from '@/components/Skeletons';
+import Oops from '@/components/Oops';
 
 const ITEMS_PER_PAGE = 6;
 
 const DashboardHackathons = () => {
     const { data, authenticate } = useAuth();
-
     const router = useRouter();
     const [currentPage, setCurrentPage] = React.useState(1);
     const [activeTab, setActiveTab] = React.useState("all");
@@ -26,7 +25,7 @@ const DashboardHackathons = () => {
         if (!data.token) {
             const handleAuthentication = async () => {
                 try {
-                    await authenticate({ userRole: "participant" });
+                    await authenticate({ userRole: "admin" });
                 } catch (error) {
                     console.error("Failed to authenticate:", error);
                     router.push("/");
@@ -37,13 +36,14 @@ const DashboardHackathons = () => {
         }
     }, [authenticate, router, data.token]);
 
-    const { data: allChallenges, isLoading, error } = useQuery({ queryKey: ['challenges'], queryFn: getChallenges });
+    const { data: allChallenges, isLoading, error } = useQuery({ queryKey: ['challenges'], queryFn: getChallenges })
+    const { data: dataAggregates, isLoading: isLoadingAggregates, error: aggregatesError } = useQuery({ queryKey: ['stats'], queryFn: () => getStatistics(data.token) });
 
-    const tabs = [{ id: 1, title: "All challenges", value: allChallenges?.data?.aggregates?.totalChallenges }, { id: 2, title: "Completed challenges", value: !isLoading && !error && allChallenges?.data?.aggregates?.totalCompletedChallenges }, { id: 3, title: "Open challenges", value: !isLoading && !error && allChallenges?.data?.aggregates?.totalOpenChallenges }, { id: 4, title: "Ongoing challenges", value: !isLoading && !error && allChallenges?.data?.aggregates?.totalOngoingChallenges }];
+    const tabs = [{ id: 1, title: "All challenges", value: dataAggregates?.data?.totalChallengesThisWeek }, { id: 2, title: "Completed challenges", value: dataAggregates?.data?.totalCompletedChallenges }, { id: 3, title: "Open challenges", value: dataAggregates?.data?.totalOpenChallenges }, { id: 4, title: "Ongoing challenges", value: dataAggregates?.data?.totalOngoingChallenges }];
 
     const filteredData = React.useMemo(() => {
         if (!isLoading && !error && allChallenges) {
-            return activeTab.toLowerCase() === "all" ? allChallenges?.data?.challenges : allChallenges.data.challenges.filter((item: { status: string }) => item.status.toLowerCase() === activeTab.toLowerCase());
+            return activeTab.toLowerCase() === "all" ? allChallenges?.data.challenges : allChallenges?.data?.challenges.filter((item: { status: string }) => item.status.toLowerCase() === activeTab.toLowerCase());
         } else {
             return []
         }
@@ -65,8 +65,12 @@ const DashboardHackathons = () => {
         setActiveTab(tab);
     };
 
+    const navigateToCreate = () => {
+        router.push("/admin/dashboard/hackathons/create");
+    }
+
     const handleViewSingle = (item) => {
-        const url = `/dashboard/hackathons/${item.challengeName}?id=${item._id}`;
+        const url = `/admin/dashboard/hackathons/${item.challengeName}?id=${item._id}`;
         router.push(url);
     };
 
@@ -78,15 +82,28 @@ const DashboardHackathons = () => {
                     <p>Join a challenge or a hackathon to gain valuable work experience</p>
                 </header>
 
-                {isLoading || error ? (<TabsSkeleton count={5} />) : (<div className='flex sm:flex-row flex-wrap flex-col items-center justify-start gap-8 sm:gap-4'>
-                    {tabs.map((item, index) => (<Button key={index} icon={(<Image
-                        src="/svgs/file.svg"
+                {isLoadingAggregates || aggregatesError ? (<TabsSkeleton count={5} />) : (<div className='flex sm:flex-row flex-wrap flex-col items-center justify-start gap-8 sm:gap-4'>
+                    {tabs.map((item, index) => (<Button
+                        key={index}
+                        icon={(<Image
+                            src="/svgs/file.svg"
+                            alt="file"
+                            width={4}
+                            height={4}
+                            className="h-4 w-4 text-primary"
+                            onClick={() => router.push("/")}
+                        />)} 
+                        classNames={`w-fit border ${item.title.split(" ")[0].toLowerCase() === activeTab ? "bg-[#D0E0FC] !border-primary" : "bg-[#F0F2F5]"} hover:bg-[#D0E0FC] text-tertiaryColor hover:text-primary sm:text-sm border-[#D0D5DD] hover:border-primary font-semibold p-2 sm:p-3`} label={item.title} hasCount={true} count={item.value} 
+                        onClick={() => handleChangeTab(item.title.split(" ")[0])} />))}
+
+                    <Button icon={(<Image
+                        src="/svgs/plus.svg"
                         alt="file"
                         width={4}
                         height={4}
                         className="h-4 w-4 text-primary"
                         onClick={() => router.push("/")}
-                    />)} classNames={`w-fit border ${item.title.split(" ")[0].toLowerCase() === activeTab ? "bg-[#D0E0FC] !border-primary" : "bg-[#F0F2F5]"} hover:bg-[#D0E0FC] text-tertiaryColor hover:text-primary sm:text-sm border-[#D0D5DD] hover:border-primary font-semibold p-2 sm:p-3`} label={item.title} hasCount={true} count={item.value} onClick={() => handleChangeTab(item.title.split(" ")[0])} />))}
+                    />)} classNames={`w-fit bg-primary text-white sm:text-sm font-semibold p-2 sm:p-4`} label={"Create New Challenge"} onClick={() => navigateToCreate()} />
                 </div>)}
 
                 {/* Challeges and Hackathons */}
@@ -103,10 +120,7 @@ const DashboardHackathons = () => {
                             onClick={() => handleViewSingle(item)}
                             imageWidth={150}
                             imageHeight={50}
-                        />)) : (<div className='h-[40vh] flex items-center justify-center sm:gap-4'>
-                            <Icon icon="tabler:mood-empty" width="34" height="34" className="text-primary" />
-                            <p className='text-primary font-bold'>Oops!, No Open Challenges available</p>
-                        </div>)}
+                        />)) : (<Oops desc={"Oops!, No Challenges available"} />)}
                     </div>
                 )}
 
